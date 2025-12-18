@@ -32,8 +32,13 @@ jobs:
         docker build -t ahanan04/cicd-pipeline:$IMAGE_TAG .
         docker push ahanan04/cicd-pipeline:$IMAGE_TAG
 
-    - name: Deploy to EKS
+    - name: Run container and extract HTML
       run: |
-        aws eks update-kubeconfig --region us-east-1 --name ${{ secrets.EKS_CLUSTER_NAME }}
-        sed -i 's|ahanan04/cicd-pipeline:latest|ahanan04/cicd-pipeline:'$IMAGE_TAG'|g' deployment.yml
-        kubectl apply -f deployment.yml
+        docker run -d --name temp-container ahanan04/cicd-pipeline:$IMAGE_TAG
+        docker cp temp-container:/usr/share/nginx/html/index.html ./extracted-index.html
+        docker stop temp-container
+        docker rm temp-container
+
+    - name: Upload to S3
+      run: |
+        aws s3 cp extracted-index.html s3://${{ secrets.S3_BUCKET_NAME }}/index.html --acl public-read
